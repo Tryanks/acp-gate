@@ -25,16 +25,16 @@ acp-gate
 
 ```mermaid
 graph LR
-  subgraph editor[编辑器主机]
+  subgraph editor["编辑器主机"]
     E[编辑器 / IDE]
     C[acp-gate（客户端）\n- stdio 桥接\n- 不审计]
   end
 
-  subgraph proxy[代理主机（可选）]
+  subgraph proxy["代理主机（可选）"]
     P[acp-gate（纯代理服务器）\n- 仅中继\n- 不审计]
   end
 
-  subgraph agent[代理运行主机]
+  subgraph agent["代理运行主机"]
     S[acp-gate（服务器）\n- 启动下游代理\n- 执行审计]
     D[下游 ACP 代理]
     A[(SQLite audit.sqlite)]
