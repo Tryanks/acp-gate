@@ -24,30 +24,40 @@ Architecture
 The diagram below shows typical topologies. Only the end server that spawns the real downstream ACP agent performs auditing and writes to SQLite.
 
 ```mermaid
-flowchart LR
-  subgraph editor[Editor Host]
+graph LR
+  subgraph editor["Editor Host"]
     E["Editor / IDE"]
-    C["acp-gate (client)<br/>- stdio bridge<br/>- no auditing"]
+    C["acp-gate (client)\n- stdio bridge\n- no auditing"]
   end
 
-  subgraph proxy[Proxy Host (optional)]
-    P["acp-gate (pure proxy server)<br/>- relay only<br/>- no auditing"]
+  subgraph proxy["Proxy Host (optional)"]
+    P["acp-gate (pure proxy server)\n- relay only\n- no auditing"]
   end
 
-  subgraph agent[Agent Host]
-    S["acp-gate (server)<br/>- launches downstream agent<br/>- performs auditing"]
+  subgraph agent["Agent Host"]
+    S["acp-gate (server)\n- launches downstream agent\n- performs auditing"]
     D[Downstream ACP Agent]
     A[(SQLite audit.sqlite)]
   end
 
-  E <-- stdio --> C
-  C <-- gRPC tunnel --> P
-  P <-- gRPC tunnel --> S
-  S <-- stdio --> D
+  %% explicit directional edges to maximize GitHub Mermaid compatibility
+  E -- stdio --> C
+  C -- stdio --> E
+
+  C -- gRPC tunnel --> P
+  P -- gRPC tunnel --> C
+
+  P -- gRPC tunnel --> S
+  S -- gRPC tunnel --> P
+
+  S -- stdio --> D
+  D -- stdio --> S
+
   S --> A
 
   %% Direct client->server (no proxy) is also possible
   C -. gRPC tunnel .-> S
+  S -. gRPC tunnel .-> C
 
   classDef audit fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
   class S,A audit

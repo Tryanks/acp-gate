@@ -24,30 +24,40 @@ acp-gate
 下图展示了典型拓扑。只有实际拉起“下游 ACP 代理”的终端服务器会执行审计并写入 SQLite。
 
 ```mermaid
-flowchart LR
-  subgraph editor[编辑器主机]
-    E[编辑器 / IDE]
-    C[acp-gate（客户端）\n- stdio 桥接\n- 不审计]
+graph LR
+  subgraph editor["编辑器主机"]
+    E["编辑器 / IDE"]
+    C["acp-gate（客户端）\n- stdio 桥接\n- 不审计"]
   end
 
-  subgraph proxy[代理主机（可选）]
-    P[acp-gate（纯代理服务器）\n- 仅中继\n- 不审计]
+  subgraph proxy["代理主机（可选）"]
+    P["acp-gate（纯代理服务器）\n- 仅中继\n- 不审计"]
   end
 
-  subgraph agent[代理运行主机]
-    S[acp-gate（服务器）\n- 启动下游代理\n- 执行审计]
+  subgraph agent["代理运行主机"]
+    S["acp-gate（服务器）\n- 启动下游代理\n- 执行审计"]
     D[下游 ACP 代理]
     A[(SQLite audit.sqlite)]
   end
 
-  E <-- stdio --> C
-  C <-- gRPC 隧道 --> P
-  P <-- gRPC 隧道 --> S
-  S <-- stdio --> D
+  %% 使用显式的单向连线，提升 GitHub Mermaid 兼容性
+  E -- stdio --> C
+  C -- stdio --> E
+
+  C -- gRPC 隧道 --> P
+  P -- gRPC 隧道 --> C
+
+  P -- gRPC 隧道 --> S
+  S -- gRPC 隧道 --> P
+
+  S -- stdio --> D
+  D -- stdio --> S
+
   S --> A
 
   %% 也可在无中转的情况下直接连接
   C -. gRPC 隧道 .-> S
+  S -. gRPC 隧道 .-> C
 
   classDef audit fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
   class S,A audit
