@@ -73,36 +73,9 @@ func main() {
     // Register raw codec for gRPC tunnel.
     encoding.RegisterCodec(remote.RawCodec)
 
-    // Resolve downstream command/args/env
-    resolvedCmd := agentCmd
-    resolvedArgs := []string(agentArgs)
-    var resolvedEnv []string
-    if cfgPath != "" {
-        rc, ra, renv, rerr := config.Resolve(cfg, agentName, agentCmd, resolvedArgs, os.Environ())
-        if rerr != nil {
-            fmt.Fprintf(os.Stderr, "%v\n", rerr)
-            os.Exit(2)
-        }
-        resolvedCmd, resolvedArgs, resolvedEnv = rc, ra, renv
-    } else {
-        if resolvedCmd == "" {
-            fmt.Fprintln(os.Stderr, "missing required flag: -agent-cmd (or provide -config or place it at ~/.config/.acp-gate/config.json)")
-            os.Exit(2)
-        }
-        resolvedEnv = os.Environ()
-    }
-
     // MODE SELECTION
     if servePort >= 0 {
         // SERVER MODE
-        // Open audit store (server-side only)
-        store, err := audit.Open(ctx, auditDBPath)
-        if err != nil {
-            fmt.Fprintf(os.Stderr, "open audit db: %v\n", err)
-            os.Exit(1)
-        }
-        defer store.Close()
-
         lis, err := net.Listen("tcp", fmt.Sprintf(":%d", servePort))
         if err != nil {
             fmt.Fprintf(os.Stderr, "listen: %v\n", err)
@@ -112,12 +85,49 @@ func main() {
         slog.Info("acp-gate server listening", "addr", addr)
 
         grpcServer := grpc.NewServer(grpc.ForceServerCodec(remote.RawCodec))
-        remote.RegisterGateServer(grpcServer, &remote.GateService{Cfg: remote.ServerConfig{
-            Cmd:   resolvedCmd,
-            Args:  resolvedArgs,
-            Env:   resolvedEnv,
-            Store: store,
-        }})
+
+        // If -connect is also provided, run as a pure proxy server.
+        if connectAddr != "" {
+            remote.RegisterGateServer(grpcServer, &remote.GateService{Cfg: remote.ServerConfig{
+                ConnectAddr: connectAddr,
+            }})
+        } else {
+            // Resolve downstream command/args/env only for server-with-agent mode
+            resolvedCmd := agentCmd
+            resolvedArgs := []string(agentArgs)
+            var resolvedEnv []string
+            if cfgPath != "" {
+                rc, ra, renv, rerr := config.Resolve(cfg, agentName, agentCmd, resolvedArgs, os.Environ())
+                if rerr != nil {
+                    fmt.Fprintf(os.Stderr, "%v\n", rerr)
+                    os.Exit(2)
+                }
+                resolvedCmd, resolvedArgs, resolvedEnv = rc, ra, renv
+            } else {
+                if resolvedCmd == "" {
+                    fmt.Fprintln(os.Stderr, "missing required flag: -agent-cmd (or provide -config or place it at ~/.config/.acp-gate/config.json)")
+                    os.Exit(2)
+                }
+                resolvedEnv = os.Environ()
+            }
+
+            // Open audit store (server-side only)
+            store, err := audit.Open(ctx, auditDBPath)
+            if err != nil {
+                fmt.Fprintf(os.Stderr, "open audit db: %v\n", err)
+                os.Exit(1)
+            }
+            // Will be closed on context done when server stops
+            // but also defer close here to ensure cleanup on early returns
+            defer store.Close()
+
+            remote.RegisterGateServer(grpcServer, &remote.GateService{Cfg: remote.ServerConfig{
+                Cmd:   resolvedCmd,
+                Args:  resolvedArgs,
+                Env:   resolvedEnv,
+                Store: store,
+            }})
+        }
 
         go func() {
             if err := grpcServer.Serve(lis); err != nil {
@@ -173,6 +183,25 @@ func main() {
     }
 
     // LOCAL MODE (legacy): direct process spawn with local auditing
+
+    // Resolve downstream command/args/env for local mode
+    resolvedCmd := agentCmd
+    resolvedArgs := []string(agentArgs)
+    var resolvedEnv []string
+    if cfgPath != "" {
+        rc, ra, renv, rerr := config.Resolve(cfg, agentName, agentCmd, resolvedArgs, os.Environ())
+        if rerr != nil {
+            fmt.Fprintf(os.Stderr, "%v\n", rerr)
+            os.Exit(2)
+        }
+        resolvedCmd, resolvedArgs, resolvedEnv = rc, ra, renv
+    } else {
+        if resolvedCmd == "" {
+            fmt.Fprintln(os.Stderr, "missing required flag: -agent-cmd (or provide -config or place it at ~/.config/.acp-gate/config.json)")
+            os.Exit(2)
+        }
+        resolvedEnv = os.Environ()
+    }
 
     store, err := audit.Open(ctx, auditDBPath)
     if err != nil {
