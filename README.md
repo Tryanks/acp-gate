@@ -16,8 +16,42 @@ Features
 - Handy CLI overrides for command, args, and env
 - Remote mode over gRPC (server/client) to decouple editor and agent host
 - Pure proxy server mode to relay bytes to another acp-gate server (no local agent, no auditing)
-- Chaining: compose multiple hops of acp-gate instances
+- Optional proxy hops between client and server (no auditing on hops)
 - Server‑side auditing only in remote mode (client/proxy hops do not audit)
+
+Architecture
+-
+The diagram below shows typical topologies. Only the end server that spawns the real downstream ACP agent performs auditing and writes to SQLite.
+
+```mermaid
+flowchart LR
+  subgraph editor[Editor Host]
+    E[Editor/IDE]
+    C[acp-gate (client)\n- stdio bridge\n- no auditing]
+  end
+
+  subgraph proxy[Proxy Host (optional)]
+    P[acp-gate (pure proxy server)\n- relay only\n- no auditing]
+  end
+
+  subgraph agent[Agent Host]
+    S[acp-gate (server)\n- launches downstream agent\n- performs auditing]
+    D[Downstream ACP Agent]
+    A[(SQLite audit.sqlite)]
+  end
+
+  E <-- stdio --> C
+  C <-- gRPC tunnel --> P
+  P <-- gRPC tunnel --> S
+  S <-- stdio --> D
+  S --> A
+
+  %% Direct client->server (no proxy) is also possible
+  C -. gRPC tunnel .-> S
+
+  classDef audit fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
+  class S,A audit
+```
 
 Download & Install
 -
@@ -51,8 +85,7 @@ acp-gate -config ~/.config/acp-gate/config.json -agent-name openai
 
 Remote mode over gRPC
 -
-In remote mode, acp-gate instances communicate over a minimal gRPC tunnel that transports raw ACP JSON-RPC bytes. This lets you run the editor on one machine and the agent on another, or insert proxy hops.
-
+In remote mode, acp-gate instances communicate over a minimal gRPC tunnel that transports raw ACP JSON-RPC bytes. This lets you run the editor on one machine and the agent on another. You can also insert optional proxy hops if needed.
 Modes:
 
 1) Server with local agent and auditing (end server)
@@ -75,14 +108,12 @@ Bridges your editor stdio to the remote server tunnel. No local agent is launche
 ```
 acp-gate -server 0 -connect <upstream_host:port>
 ```
-Accepts client connections and relays them to another acp-gate server. Useful for inserting hops, network boundaries, or shims. Auditing is not performed on the proxy; only the end server that launches the agent audits.
+Accepts client connections and relays them to another acp-gate server. Useful for inserting one or more hops, crossing network boundaries, or adding shims. Auditing is not performed on proxy hops; only the final server that launches the agent audits.
 
 Chaining
 -
-You can chain multiple acp-gate instances. Examples:
+You can insert one or more proxy hops between client and server as needed (no auditing on hops). See the Architecture diagram above.
 
-- Editor -> `acp-gate -connect hostA:port` -> `acp-gate -server 0 -connect hostB:port` -> `acp-gate -server 0 -agent-cmd <cmd>`
-- Editor -> `acp-gate -connect hostA:port` -> `acp-gate -server 0 -config <cfg> -agent-name <name>`
 
 Auditing behavior in remote mode:
 - Only the end server that actually launches the downstream agent performs auditing.
