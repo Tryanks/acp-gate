@@ -12,6 +12,7 @@ import (
 
 	acp "github.com/coder/acp-go-sdk"
 	"acp-gate/internal/audit"
+	"acp-gate/internal/config"
 	"acp-gate/internal/proxy"
 )
 
@@ -24,42 +25,76 @@ func (m *multiFlag) Set(v string) error {
 }
 
 func main() {
-	var (
-		auditDBPath string
-		agentCmd    string
-		agentArgs   multiFlag
-	)
+    var (
+        auditDBPath string
+        cfgPath     string
+        agentName   string
+        agentCmd    string
+        agentArgs   multiFlag
+    )
 
-	flag.StringVar(&auditDBPath, "audit-db", "audit.sqlite", "path to SQLite audit DB")
-	flag.StringVar(&agentCmd, "agent-cmd", "", "downstream real agent command")
-	flag.Var(&agentArgs, "agent-arg", "argument for downstream agent (repeatable)")
-	flag.Parse()
+    flag.StringVar(&auditDBPath, "audit-db", "audit.sqlite", "path to SQLite audit DB")
+    flag.StringVar(&cfgPath, "config", "", "path to JSON config file with agent_servers (default: ~/.config/.acp-gate/config.json if present)")
+    flag.StringVar(&agentName, "agent-name", "", "agent server name from config to use")
+    flag.StringVar(&agentCmd, "agent-cmd", "", "downstream real agent command")
+    flag.Var(&agentArgs, "agent-arg", "argument for downstream agent (repeatable)")
+    flag.Parse()
 
-	if agentCmd == "" {
-		fmt.Fprintln(os.Stderr, "missing required flag: -agent-cmd")
-		os.Exit(2)
-	}
+    var cfg config.Config
+    var err error
+    if cfgPath == "" {
+        if p, ok := config.FindExistingDefaultConfig(); ok {
+            cfgPath = p
+        }
+    }
+    if cfgPath != "" {
+        cfg, err = config.Load(cfgPath)
+        if err != nil {
+            fmt.Fprintf(os.Stderr, "load config: %v\n", err)
+            os.Exit(2)
+        }
+    }
 
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	slog.SetDefault(logger)
+    logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+    slog.SetDefault(logger)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+    ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+    defer stop()
 
-	store, err := audit.Open(ctx, auditDBPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "open audit db: %v\n", err)
-		os.Exit(1)
-	}
-	defer store.Close()
+    store, err := audit.Open(ctx, auditDBPath)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "open audit db: %v\n", err)
+        os.Exit(1)
+    }
+    defer store.Close()
 
-	downstream := exec.CommandContext(ctx, agentCmd, agentArgs...)
-	downstream.Stderr = os.Stderr
+    // Resolve downstream command/args/env
+    resolvedCmd := agentCmd
+    resolvedArgs := []string(agentArgs)
+    var resolvedEnv []string
+    if cfgPath != "" {
+        rc, ra, renv, rerr := config.Resolve(cfg, agentName, agentCmd, resolvedArgs, os.Environ())
+        if rerr != nil {
+            fmt.Fprintf(os.Stderr, "%v\n", rerr)
+            os.Exit(2)
+        }
+        resolvedCmd, resolvedArgs, resolvedEnv = rc, ra, renv
+    } else {
+        if resolvedCmd == "" {
+            fmt.Fprintln(os.Stderr, "missing required flag: -agent-cmd (or provide -config or place it at ~/.config/.acp-gate/config.json)")
+            os.Exit(2)
+        }
+        resolvedEnv = os.Environ()
+    }
 
-	dsIn, err := downstream.StdinPipe()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "downstream stdin: %v\n", err)
-		os.Exit(1)
+    downstream := exec.CommandContext(ctx, resolvedCmd, resolvedArgs...)
+    downstream.Stderr = os.Stderr
+    downstream.Env = resolvedEnv
+
+    dsIn, err := downstream.StdinPipe()
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "downstream stdin: %v\n", err)
+        os.Exit(1)
 	}
 	dsOut, err := downstream.StdoutPipe()
 	if err != nil {
