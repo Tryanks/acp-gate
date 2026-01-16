@@ -166,3 +166,43 @@ func Resolve(cfg Config, agentName, cliCmd string, cliArgs []string, baseEnv []s
     env = MergeEnv(baseEnv, as.Env)
     return cmd, args, env, nil
 }
+
+// DefaultConfigPaths returns preferred config file locations to check
+// when the -config flag is not provided.
+// Order of preference:
+//   1) $XDG_CONFIG_HOME/.acp-gate/config.json
+//   2) $XDG_CONFIG_HOME/acp-gate/config.json
+//   3) ~/.config/.acp-gate/config.json
+//   4) ~/.config/acp-gate/config.json
+func DefaultConfigPaths() []string {
+    var paths []string
+
+    xdg := os.Getenv("XDG_CONFIG_HOME")
+    if xdg != "" {
+        paths = append(paths,
+            filepath.Join(xdg, ".acp-gate", "config.json"),
+            filepath.Join(xdg, "acp-gate", "config.json"),
+        )
+    }
+
+    if home, err := os.UserHomeDir(); err == nil && home != "" {
+        base := filepath.Join(home, ".config")
+        paths = append(paths,
+            filepath.Join(base, ".acp-gate", "config.json"),
+            filepath.Join(base, "acp-gate", "config.json"),
+        )
+    }
+
+    return paths
+}
+
+// FindExistingDefaultConfig returns the first existing config file among
+// DefaultConfigPaths. If none exist, ok is false.
+func FindExistingDefaultConfig() (path string, ok bool) {
+    for _, p := range DefaultConfigPaths() {
+        if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+            return p, true
+        }
+    }
+    return "", false
+}

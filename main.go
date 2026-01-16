@@ -34,7 +34,7 @@ func main() {
     )
 
     flag.StringVar(&auditDBPath, "audit-db", "audit.sqlite", "path to SQLite audit DB")
-    flag.StringVar(&cfgPath, "config", "", "path to JSON config file with agent_servers")
+    flag.StringVar(&cfgPath, "config", "", "path to JSON config file with agent_servers (default: ~/.config/.acp-gate/config.json if present)")
     flag.StringVar(&agentName, "agent-name", "", "agent server name from config to use")
     flag.StringVar(&agentCmd, "agent-cmd", "", "downstream real agent command")
     flag.Var(&agentArgs, "agent-arg", "argument for downstream agent (repeatable)")
@@ -42,6 +42,11 @@ func main() {
 
     var cfg config.Config
     var err error
+    if cfgPath == "" {
+        if p, ok := config.FindExistingDefaultConfig(); ok {
+            cfgPath = p
+        }
+    }
     if cfgPath != "" {
         cfg, err = config.Load(cfgPath)
         if err != nil {
@@ -76,7 +81,7 @@ func main() {
         resolvedCmd, resolvedArgs, resolvedEnv = rc, ra, renv
     } else {
         if resolvedCmd == "" {
-            fmt.Fprintln(os.Stderr, "missing required flag: -agent-cmd (or provide -config)")
+            fmt.Fprintln(os.Stderr, "missing required flag: -agent-cmd (or provide -config or place it at ~/.config/.acp-gate/config.json)")
             os.Exit(2)
         }
         resolvedEnv = os.Environ()

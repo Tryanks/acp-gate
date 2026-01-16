@@ -92,3 +92,39 @@ func TestResolve(t *testing.T) {
         t.Fatalf("unexpected env: %+v", mv)
     }
 }
+
+func TestDefaultConfigPaths_XDG(t *testing.T) {
+    t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "xdg"))
+    paths := DefaultConfigPaths()
+    if len(paths) < 2 {
+        t.Fatalf("expected at least 2 paths, got %d", len(paths))
+    }
+    if !strings.HasSuffix(paths[0], filepath.Join(".acp-gate", "config.json")) {
+        t.Fatalf("unexpected first default path: %q", paths[0])
+    }
+    if !strings.Contains(paths[0], string(os.PathSeparator)+"xdg"+string(os.PathSeparator)) {
+        t.Fatalf("first path should use XDG_CONFIG_HOME, got %q", paths[0])
+    }
+}
+
+func TestFindExistingDefaultConfig(t *testing.T) {
+    // Force lookup under HOME .config
+    home := t.TempDir()
+    t.Setenv("XDG_CONFIG_HOME", "")
+    t.Setenv("HOME", home)
+    // Create ~/.config/.acp-gate/config.json
+    p := filepath.Join(home, ".config", ".acp-gate", "config.json")
+    if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+        t.Fatalf("mkdir: %v", err)
+    }
+    if err := os.WriteFile(p, []byte(`{"agent_servers":{}}`), 0o644); err != nil {
+        t.Fatalf("write: %v", err)
+    }
+    got, ok := FindExistingDefaultConfig()
+    if !ok {
+        t.Fatalf("expected to find default config")
+    }
+    if got != p {
+        t.Fatalf("expected %q, got %q", p, got)
+    }
+}
