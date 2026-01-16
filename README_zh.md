@@ -19,6 +19,40 @@ acp-gate
 - 支持链式组合多个 acp-gate 节点
 - 仅在远端“终端服务器”侧进行审计（客户端/中转节点不审计）
 
+架构
+-
+下图展示了典型拓扑。只有实际拉起“下游 ACP 代理”的终端服务器会执行审计并写入 SQLite。
+
+```mermaid
+flowchart LR
+  subgraph editor[编辑器主机]
+    E[编辑器 / IDE]
+    C[acp-gate（客户端）\n- stdio 桥接\n- 不审计]
+  end
+
+  subgraph proxy[代理主机（可选）]
+    P[acp-gate（纯代理服务器）\n- 仅中继\n- 不审计]
+  end
+
+  subgraph agent[代理运行主机]
+    S[acp-gate（服务器）\n- 启动下游代理\n- 执行审计]
+    D[下游 ACP 代理]
+    A[(SQLite audit.sqlite)]
+  end
+
+  E <-- stdio --> C
+  C <-- gRPC 隧道 --> P
+  P <-- gRPC 隧道 --> S
+  S <-- stdio --> D
+  S --> A
+
+  %% 也可在无中转的情况下直接连接
+  C -. gRPC 隧道 .-> S
+
+  classDef audit fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
+  class S,A audit
+```
+
 下载与安装
 -
 1) 从以下页面下载与你的操作系统/架构匹配的最新发行版：

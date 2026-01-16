@@ -19,6 +19,40 @@ Features
 - Chaining: compose multiple hops of acp-gate instances
 - Server‑side auditing only in remote mode (client/proxy hops do not audit)
 
+Architecture
+-
+The diagram below shows typical topologies. Only the end server that spawns the real downstream ACP agent performs auditing and writes to SQLite.
+
+```mermaid
+flowchart LR
+  subgraph editor[Editor Host]
+    E[Editor/IDE]
+    C[acp-gate (client)\n- stdio bridge\n- no auditing]
+  end
+
+  subgraph proxy[Proxy Host (optional)]
+    P[acp-gate (pure proxy server)\n- relay only\n- no auditing]
+  end
+
+  subgraph agent[Agent Host]
+    S[acp-gate (server)\n- launches downstream agent\n- performs auditing]
+    D[Downstream ACP Agent]
+    A[(SQLite audit.sqlite)]
+  end
+
+  E <-- stdio --> C
+  C <-- gRPC tunnel --> P
+  P <-- gRPC tunnel --> S
+  S <-- stdio --> D
+  S --> A
+
+  %% Direct client->server (no proxy) is also possible
+  C -. gRPC tunnel .-> S
+
+  classDef audit fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
+  class S,A audit
+```
+
 Download & Install
 -
 1) Download the latest release for your OS/arch from:
