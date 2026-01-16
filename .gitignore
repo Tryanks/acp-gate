@@ -1,0 +1,21 @@
+# Binaries
+bin/
+acp-gate
+
+# OS files
+.DS_Store
+
+# Go
+vendor/
+*.test
+*.prof
+
+# Audit database
+audit.sqlite
+audit.sqlite-journal
+audit.sqlite-shm
+audit.sqlite-wal
+
+# IDE
+.idea/
+.vscode/
