@@ -26,16 +26,16 @@ The diagram below shows typical topologies. Only the end server that spawns the 
 ```mermaid
 flowchart LR
   subgraph editor[Editor Host]
-    E[Editor/IDE]
-    C[acp-gate (client)\n- stdio bridge\n- no auditing]
+    E["Editor / IDE"]
+    C["acp-gate (client)<br/>- stdio bridge<br/>- no auditing"]
   end
 
   subgraph proxy[Proxy Host (optional)]
-    P[acp-gate (pure proxy server)\n- relay only\n- no auditing]
+    P["acp-gate (pure proxy server)<br/>- relay only<br/>- no auditing"]
   end
 
   subgraph agent[Agent Host]
-    S[acp-gate (server)\n- launches downstream agent\n- performs auditing]
+    S["acp-gate (server)<br/>- launches downstream agent<br/>- performs auditing"]
     D[Downstream ACP Agent]
     A[(SQLite audit.sqlite)]
   end
