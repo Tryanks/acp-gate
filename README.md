@@ -11,26 +11,40 @@ Features
 - Persistent audit log (SQLite) of all requests/responses
 - Best‑effort extraction of user/agent text for easier browsing
 - Simple JSON configuration with named agent servers
-- CLI overrides for command, args, and env merging
+- Handy CLI overrides for command, args, and env
 
-Requirements
+Download & Install
 -
-- Go 1.25+
+1) Download the latest release for your OS/arch from:
+   https://github.com/Tryanks/acp-gate/releases/latest
 
-Install
--
-```
-# From repository root
-go build -o acp-gate
-# Or install into your GOPATH/bin
-go install ./...
-```
+2) Unpack the archive and place the acp-gate binary somewhere on your PATH
+   (for example: /usr/local/bin on macOS/Linux, or add the folder to PATH on Windows).
 
-Usage
+3) macOS/Linux users may need to make it executable:
+   chmod +x acp-gate
+
+Quick start
 -
 acp-gate is intended to be launched by your editor/IDE in place of the real agent. It will then spawn the real agent and proxy all messages while auditing them.
 
-Command-line flags:
+Examples:
+
+1) Run with an explicit downstream command
+```
+acp-gate \
+  -agent-cmd /usr/local/bin/my-acp-agent \
+  -agent-arg --model \
+  -agent-arg gpt-4o
+```
+
+2) Run using a config-defined agent
+```
+acp-gate -config ~/.config/acp-gate/config.json -agent-name openai
+```
+
+Command-line flags (common)
+-
 - -audit-db string
   Path to SQLite audit DB (default: audit.sqlite)
 - -config string
@@ -42,24 +56,9 @@ Command-line flags:
 - -agent-arg value
   Argument for downstream agent (repeatable)
 
-Examples:
-
-1) Run with explicit downstream command
-```
-./acp-gate \
-  -agent-cmd /usr/local/bin/my-acp-agent \
-  -agent-arg --model \
-  -agent-arg gpt-4o
-```
-
-2) Run using a config-defined agent
-```
-./acp-gate -config ~/.config/acp-gate/config.json -agent-name openai
-```
-
 Configuration
 -
-acp-gate looks for a config file when -config is not provided. Order of preference:
+If -config is not provided, acp-gate looks for a config file in this order:
 1) $XDG_CONFIG_HOME/.acp-gate/config.json
 2) $XDG_CONFIG_HOME/acp-gate/config.json
 3) ~/.config/.acp-gate/config.json
@@ -96,14 +95,7 @@ By default acp-gate writes to ./audit.sqlite. Each record contains:
 - Raw JSON payload
 - Best‑effort extracted user_text/agent_text (for prompt/response chunks and updates)
 
-Be mindful of sensitive data: the audit DB can include full prompt and response contents.
-
-Development
--
-Run tests:
-```
-go test ./...
-```
+Privacy note: the audit DB can include full prompt and response contents. Handle it with care.
 
 License
 -
