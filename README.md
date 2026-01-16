@@ -5,6 +5,8 @@ A small, transparent ACP proxy that sits between your editor (upstream) and a re
 
 Built on top of github.com/coder/acp-go-sdk.
 
+[中文版](README_zh.md)
+
 Features
 -
 - Transparent stdin/stdout proxy between editor and agent
