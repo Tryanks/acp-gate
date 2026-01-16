@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package acpgate.v1;
+
+option go_package = "acp-gate/internal/remote/gen/acpgate/v1;acpgatev1";
+
+// A minimal byte-stream tunnel to carry ACP JSON-RPC.
+message StreamChunk {
+  bytes data = 1;
+}
+
+service Gate {
+  rpc Tunnel(stream StreamChunk) returns (stream StreamChunk);
+}
