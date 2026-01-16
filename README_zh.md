@@ -16,7 +16,7 @@ acp-gate
 - 提供 CLI 覆盖项以便覆盖命令、参数与环境变量
 - 通过 gRPC 支持远程模式（服务端/客户端），将编辑器与代理运行主机解耦
 - 纯代理服务器模式：仅将字节转发到另一台 acp-gate 服务器（不启动本地代理，不审计）
-- 支持链式组合多个 acp-gate 节点
+- 可选代理跳点（客户端与服务器之间可插入一个或多个中转；中转不审计）
 - 仅在远端“终端服务器”侧进行审计（客户端/中转节点不审计）
 
 架构
@@ -85,7 +85,7 @@ acp-gate -config ~/.config/acp-gate/config.json -agent-name openai
 
 gRPC 远程模式
 -
-在远程模式下，acp-gate 实例通过一个极简的 gRPC 隧道传输原始 ACP JSON-RPC 字节。这样可以将编辑器运行在一台机器上，而将代理运行在另一台机器上，或在两者之间插入多个代理跳点。
+在远程模式下，acp-gate 实例通过一个极简的 gRPC 隧道传输原始 ACP JSON-RPC 字节。这样可以将编辑器运行在一台机器上，而将代理运行在另一台机器上。也可以根据需要在两者之间插入可选的代理跳点。
 
 模式：
 
@@ -109,14 +109,12 @@ acp-gate -connect <host:port>
 ```
 acp-gate -server 0 -connect <upstream_host:port>
 ```
-接受客户端连接并将其中继到另一台 acp-gate 服务器。适合插入跳点、跨越网络边界或接入网关。纯代理不进行审计；只有实际启动下游代理的“终端服务器”会审计。
+接受客户端连接并将其中继到另一台 acp-gate 服务器。适合插入一个或多个跳点、跨越网络边界或添加垫片。纯代理跳点不审计；只有最终启动下游代理的服务器会审计。
 
 链式组合
 -
-你可以将多个 acp-gate 串联。例如：
+可按需在客户端与服务器之间插入一个或多个代理跳点（中转不审计）。参见上方架构图。
 
-- 编辑器 -> `acp-gate -connect hostA:port` -> `acp-gate -server 0 -connect hostB:port` -> `acp-gate -server 0 -agent-cmd <cmd>`
-- 编辑器 -> `acp-gate -connect hostA:port` -> `acp-gate -server 0 -config <cfg> -agent-name <name>`
 
 远程模式下的审计行为：
 - 只有实际启动下游代理的“终端服务器”执行审计。
